@@ -1,0 +1,147 @@
+using Dashboard2.Models;
+using Microsoft.AspNetCore.Authentication.Cookies;
+using Microsoft.AspNetCore.Builder;
+using Microsoft.AspNetCore.DataProtection;
+using Microsoft.AspNetCore.Http;
+using Microsoft.AspNetCore.Identity;
+using Microsoft.AspNetCore.Mvc;
+using Microsoft.AspNetCore.Mvc.Infrastructure;
+using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.Hosting;
+using StackExchange.Redis;
+using System;
+
+var builder = WebApplication.CreateBuilder(args);
+
+
+builder.Services.AddSingletonIHttpContextAccessor, HttpContextAccessor();
+builder.Services.AddDistributedMemoryCache();
+builder.Services.AddScopedBaseActionFilter();
+
+ Add services to the container.
+builder.Services.AddControllersWithViews();
+
+builder.Services.AddStackExchangeRedisCache(options =
+{
+	options.Configuration = Config.Get(RedisHost);
+	options.InstanceName = Config.Get(KeyPrefix);
+
+	options.ConfigurationOptions = new ConfigurationOptions();
+
+	string strHost = Config.Get(RedisHost);
+
+	if (strHost.Contains(,))
+	{
+		string[] lstHost = strHost.Split(,);
+		int hostLenght = lstHost.Length;
+
+		for (int i = 0; i  hostLenght; i++)
+		{
+			options.ConfigurationOptions.EndPoints.Add(lstHost[i]);
+		}
+	}
+	else
+	{
+		options.ConfigurationOptions.EndPoints.Add(Config.Get(RedisHost));
+	}
+
+	options.ConfigurationOptions.Password = Config.Get(RedisPassword);
+	options.ConfigurationOptions.DefaultDatabase = Config.Get(RedisDb).ConvertToInt();
+	options.ConfigurationOptions.SyncTimeout = Config.Get(timeout).ConvertToInt();
+	options.ConfigurationOptions.ConnectTimeout = Config.Get(timeout).ConvertToInt();
+	options.ConfigurationOptions.AllowAdmin = true;
+
+});
+
+ Force redirection to HTTPS
+builder.Services.AddHttpsRedirection(options =
+{
+	options.RedirectStatusCode = StatusCodes.Status308PermanentRedirect;
+	options.HttpsPort = 443;
+});
+
+builder.Services.AddAuthentication(CookieAuthenticationDefaults.AuthenticationScheme)
+	.AddCookie(options =
+	{
+		options.Cookie.HttpOnly = true;
+		options.LoginPath = SecurityLogin;
+		options.AccessDeniedPath = SecuritySessionExpired;
+		options.LogoutPath = AccountsLogout;
+		options.SlidingExpiration = true;
+		options.ExpireTimeSpan = TimeSpan.FromMinutes(Config.Get(LoginTimeOut).ConvertToDouble());
+	});
+
+builder.Services.AddMvc(options =
+{
+	options.Filters.Add(new AutoValidateAntiforgeryTokenAttribute());
+});
+services.AddMvc();
+builder.Services.ConfigureSecurityStampValidatorOptions(o = o.ValidationInterval = TimeSpan.FromHours(10));   Pulin Case 140433
+builder.Services.AddControllersWithViews(x = x.SuppressAsyncSuffixInActionNames = false).AddRazorRuntimeCompilation();
+builder.Services.AddDataProtection()
+		.PersistKeysToFileSystem(new System.IO.DirectoryInfo(Config.Get(DataProtectionDirectory).ToString()))
+		.SetDefaultKeyLifetime(TimeSpan.FromDays(90));
+
+for modelstate solution
+builder.Services.AddControllers(
+    options = options.SuppressImplicitRequiredAttributeForNonNullableReferenceTypes = true);
+
+builder.Services.ConfigureIISServerOptions(options =
+{
+	options.AutomaticAuthentication = false;
+});
+
+
+
+var app = builder.Build();
+
+ Configure the HTTP request pipeline.
+app.UseExceptionHandler(HomeCustomError);
+app.UseHsts();
+common.IsDevelopmentEnvironment = false;
+
+string enviro = app.Environment.EnvironmentName;
+
+if (enviro.ToLower().Equals(EnumEnvironment.Production.ToString().ToLower()))
+	common.SiteEnvironment = EnumEnvironment.Production;
+else if (enviro.ToLower().Equals(EnumEnvironment.Staging.ToString().ToLower()))
+	common.SiteEnvironment = EnumEnvironment.Staging;
+else if (enviro.ToLower().Equals(EnumEnvironment.Beta.ToString().ToLower()))
+	common.SiteEnvironment = EnumEnvironment.Beta;
+else if (enviro.ToLower().Equals(EnumEnvironment.Production.ToString().ToLower()))
+	common.SiteEnvironment = EnumEnvironment.Production;
+
+if (!app.Environment.IsDevelopment())
+{
+    app.UseExceptionHandler(HomeError);
+}
+
+app.UseStaticFiles();
+
+app.UseRouting();
+
+Added Cookies Secure In Browser #CORE-1364 Added By Krishnan
+app.UseCookiePolicy(new CookiePolicyOptions
+{
+	HttpOnly = Microsoft.AspNetCore.CookiePolicy.HttpOnlyPolicy.Always,
+	Secure = CookieSecurePolicy.Always,
+});
+
+
+app.UseAuthentication();
+app.UseAuthorization();
+
+common.APIURL = Config.Get(APIURL);
+
+app.UseEndpoints(endpoints =
+{
+    endpoints.MapControllerRoute(
+    name default,
+    pattern {controller=Security}{action=Login}{page});
+});
+
+app.MapControllerRoute(
+	name default,
+	pattern {controller=Security}{action=Login}{page});
+
+app.Run();
